@@ -1,8 +1,11 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+from agent import myEnv as Agent
+
 
 import numpy as np
-from agent import myEnv as Agent
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import time
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.layers import Dense
@@ -32,8 +35,8 @@ def choose_action(state, nnet, epsilon):
 
 
 def rl(env, epsilon, alpha, gamma, n_episodes,
-       sleep_time=0.01, actions=8, vis=True, max_steps=1000,
-       decay=0.9, min_epsilon=0.01):
+       sleep_time=0.001, actions=9, vis=True, max_steps=1000,
+       decay=0.99, min_epsilon=0.01):
 
     state = env._get_state()
     q_nnet = build_q_nnet(len(state), actions, alpha)
@@ -67,6 +70,8 @@ def rl(env, epsilon, alpha, gamma, n_episodes,
             S = S_  # move to next state
 
             if vis and not done:
+                if step + 1 % 100 == 0:
+                    print(f"[Epsisode {episode + 1}] Step {step + 1}")
                 env.render()
                 time.sleep(sleep_time)
 
@@ -92,7 +97,7 @@ def main():
         gamma=1.0,
         n_episodes=10,
         vis=True,
-        decay=0.9
+        decay=0.99,
         max_steps=1000,
     )
 
