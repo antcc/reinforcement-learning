@@ -1,27 +1,52 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from agent import myEnv as Agent
-
-
 import numpy as np
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import time
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Sequential
-
-np.random.seed(1)
+from collections import deque
+import random
+from tensorflow.keras.models import load_model
 
 
 def build_q_nnet(n_vars, n_actions, alpha):
     model = Sequential()
-    model.add(Dense(10, input_shape=(n_vars,),
+    model.add(Dense(20, input_shape=(n_vars,),
+                    bias_initializer="RandomNormal",
+                    activation="relu"))
+    model.add(Dense(20, input_shape=(n_vars,),
                     bias_initializer="RandomNormal",
                     activation="relu"))
     model.add(Dense(n_actions))
     model.compile(loss='mse', optimizer=Adam(learning_rate=alpha))
     return model
+
+def replay(q_nnet, gamma, mem, n_actions, max_samples=100):
+    if max_samples <= 0:
+        return q_nnet
+
+    n_samples = min(max_samples, len(mem))
+    minibatch = random.sample(list(mem), n_samples)
+    X_train = np.zeros((n_samples, minibatch[0][0].shape[0]))
+    y_train = np.zeros((n_samples, n_actions))
+
+    #TODO: predict all at once
+    for i, (S, A, R, S_, done) in enumerate(minibatch):
+        if not done:
+            # next state is not terminal:
+            q_target = R + gamma*q_nnet.predict(S_.reshape(1, -1)).max()
+        else:
+            q_target = R # next state is terminal
+
+        target_vector = q_nnet.predict(S.reshape(1, -1))
+        target_vector[0][A] = q_target
+        X_train[i] = S
+        y_train[i] = target_vector[0]
+
+    q_nnet.fit(X_train, y_train, verbose=0, epochs=1) # update
+    return q_nnet
 
 
 def choose_action(state, nnet, epsilon):
@@ -34,12 +59,39 @@ def choose_action(state, nnet, epsilon):
     return act
 
 
+def test_policy(env, q_nnet, vis=True,
+                sleep_time=0.001, max_steps=1000):
+    S = env.reset()
+    total_reward = 0
+
+    for step in range(max_steps):
+        act = np.argmax(q_nnet.predict(S.reshape(1, -1))[0])
+        S_, R, done, _ = env.step(act)
+        total_reward += R
+        S = S_  # move to next state
+
+        if vis and not done:
+            if step + 1 % 100 == 0:
+                print(f"[test_policy] Step {step + 1}")
+            env.render()
+            time.sleep(sleep_time)
+
+        if done:
+            print(f"[test_policy] Alcanza objetivo tras {step + 1} pasos")
+            break
+        elif step + 1 == max_steps:
+            print(f"[test_policy] No alcanza objetivo tras {step + 1} pasos")
+
+    return total_reward
+
+
 def rl(env, epsilon, alpha, gamma, n_episodes,
        sleep_time=0.001, actions=9, vis=True, max_steps=1000,
-       decay=0.99, min_epsilon=0.01):
+       decay=0.99, min_epsilon=0.01, n_memory=500, batch_size=100):
 
     state = env._get_state()
     q_nnet = build_q_nnet(len(state), actions, alpha)
+    mem = deque(maxlen=n_memory)
     steps_hist = []
     rewards_hist = []
 
@@ -53,32 +105,26 @@ def rl(env, epsilon, alpha, gamma, n_episodes,
             # take action & get next state and reward
             S_, R, done, _ = env.step(act)
             total_reward += R
-
-            if not done:
-                # next state is not terminal
-                q_target = R + gamma*q_nnet.predict(S_.reshape(1, -1)).max()
-            else:
-                q_target = R            # next state is terminal
-                print('Episodio %s: total steps = %s, total reward = %.2f' % (
-                    episode + 1, step + 1, total_reward))
-
-            target_vector = q_nnet.predict(S.reshape(1, -1))
-            target_vector[0][act] = q_target
-            q_nnet.fit(S.reshape(1, -1), target_vector,
-                       verbose=0, epochs=1)  # update
-
+            mem.append([S, act, R, S_, done])
             S = S_  # move to next state
+
+            if (step + 1) % n_memory == 0:
+                q_nnet = replay(q_nnet, gamma, mem, actions, batch_size)
 
             if vis and not done:
                 if step + 1 % 100 == 0:
-                    print(f"[Epsisode {episode + 1}] Step {step + 1}")
+                    print(f"[Episodio {episode + 1}] Step {step + 1}")
                 env.render()
                 time.sleep(sleep_time)
 
             if done:
                 steps_hist.append(step + 1)
-                rewards_hist.append(step + 1)
+                rewards_hist.append(total_reward + 1)
+                q_nnet = replay(q_nnet, gamma, mem, actions, (step + 1) % n_memory) # TODO: ????
+                print('Episodio %s: total steps = %s, total reward = %.2f' % (
+                    episode + 1, step + 1, total_reward))
                 break
+
             elif step + 1 == max_steps:
                 print(f"Episodio {episode + 1}: no alcanza tras {step + 1} pasos")
 
@@ -89,17 +135,28 @@ def rl(env, epsilon, alpha, gamma, n_episodes,
 
 
 def main():
+    np.random.seed(1)
+    random.seed(1)
+
     env = Agent(mode='easy')
-    q_nnet, _ = rl(
+    # TODO: change parameters & nnet structure
+    q_nnet, episodes, steps, rewards = rl(
         env,
-        epsilon=0.1,
-        alpha=0.01,
-        gamma=1.0,
-        n_episodes=10,
+        epsilon=0.2,
+        alpha=1e-3,
+        gamma=0.9,
+        n_episodes=2,
         vis=True,
         decay=0.99,
-        max_steps=1000,
+        max_steps=200,
+        n_memory=1,  #TODO: cambiar?
+        batch_size=1,  # TODO: cambiar?
     )
+    q_nnet.save_model('q_nnet.h5')
+
+    # q_nnet = load_model('q_nnet.h5')
+    total_R = test_policy(env, q_nnet, vis=True)
+    print(f"Refuerzo total política: {total_R:.2f}")
 
 
 if __name__ == '__main__':

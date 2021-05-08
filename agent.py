@@ -5,8 +5,7 @@ from gym.spaces import Discrete, Box
 
 
 class myEnv(gym.Env):
-    metadata = {"render.modes": [
-        "human", "rgb_array"], "video.frames_per_second": 50}
+    metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 50}
 
     def __init__(self, target_coords=[250, 303], mode="hard"):
         self.state_dim = 7
@@ -57,13 +56,12 @@ class myEnv(gym.Env):
         self.got_target = False
 
         if self.mode == "hard":
-            pxy = np.random.randint(low=-self.viewer_xy[0] + self.center_coords[0],
-                                    high=self.viewer_xy[0] -
-                                    self.center_coords[0],
-                                    size=2)
+            pxy = np.random.randint(low = -self.viewer_xy[0] + self.center_coords[0],
+                                    high = self.viewer_xy[0] - self.center_coords[0],
+                                    size = 2)
             self.target_coords[:] = np.clip(pxy, 100, 300)
         else:
-            # TODO: mover el brazo a una posición aleatoria
+            #TODO: mover el brazo a una posición aleatoria
             self.arm1_ang = 0
             self.arm2_ang = 0
             self.arm1_coords = np.array([0, 0])
@@ -95,19 +93,19 @@ class myEnv(gym.Env):
         self.arm1_coords[1] += self.arm1_long * np.sin(self.arm1_ang)
 
         self.arm2_coords = self.arm1_coords.copy()
-        self.arm2_coords[0] += self.arm2_long * \
-            np.cos(self.arm1_ang + self.arm2_ang)
-        self.arm2_coords[1] += self.arm2_long * \
-            np.sin(self.arm1_ang + self.arm2_ang)
+        self.arm2_coords[0] += self.arm2_long * np.cos(self.arm1_ang + self.arm2_ang)
+        self.arm2_coords[1] += self.arm2_long * np.sin(self.arm1_ang + self.arm2_ang)
 
         s = self._get_state()
 
         # Euclidean distance between
-        r = np.linalg.norm(self.arm2_coords - self.target_coords)
+        dist = np.linalg.norm(self.arm2_coords - self.target_coords)
+        self.got_target = dist < self.target_width
+        r = -dist/200
+        if self.got_target:
+            r += 1
 
-        self.got_target = r < self.target_width
-
-        return s, -r/200, self.got_target, {}
+        return s, r, self.got_target, {}
 
     def close(self):
         if self.viewer:
