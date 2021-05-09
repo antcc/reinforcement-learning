@@ -9,9 +9,9 @@ from tensorflow.keras.models import Sequential
 from collections import deque
 import random
 from tensorflow.keras.models import load_model
+from tensorflow.keras.optimizers.schedules import ExponentialDecay
 
-
-def build_q_nnet(n_vars, n_actions, alpha):
+def build_q_nnet(n_vars, n_actions, alpha, lr_decay):
     model = Sequential()
     model.add(Dense(20, input_shape=(n_vars,),
                     bias_initializer="RandomNormal",
@@ -20,7 +20,17 @@ def build_q_nnet(n_vars, n_actions, alpha):
     #                 bias_initializer="RandomNormal",
     #                 activation="relu"))
     model.add(Dense(n_actions))
-    model.compile(loss='mse', optimizer=Adam(learning_rate=alpha))
+
+    if lr_decay:
+        lr = ExponentialDecay(
+            alpha,
+            decay_steps=100000,
+            decay_rate=0.96,
+            staircase=True)
+    else:
+        lr = alpha
+
+    model.compile(loss='mse', optimizer=Adam(learning_rate=lr))
     return model
 
 
@@ -88,11 +98,11 @@ def test_policy(env, q_nnet, vis=True,
 def rl(env, epsilon, alpha, gamma, n_episodes,
        sleep_time=0.001, actions=9, vis=True, max_steps=1000,
        decay=0.99, min_epsilon=0.01, n_memory=500, batch_size=100,
-       q_nnet = None):
+       q_nnet=None, lr_decay=False):
 
     if q_nnet is None:
         state = env._get_state()
-        q_nnet = build_q_nnet(len(state), actions, alpha)
+        q_nnet = build_q_nnet(len(state), actions, alpha, lr_decay)
     mem = deque(maxlen=n_memory)
     steps_hist = []
     rewards_hist = []
@@ -146,7 +156,8 @@ def main():
     q_nnet, episodes, steps, rewards = rl(
         env,
         epsilon=0.2,
-        alpha=1e-2,
+        alpha=1e-1,
+        lr_decay=True,
         gamma=1.0,
         n_episodes=200,
         vis=True,
@@ -154,7 +165,7 @@ def main():
         max_steps=300,
         n_memory=50,  #TODO: cambiar?
         batch_size=5,  # TODO: cambiar?
-        q_nnet=model
+        q_nnet=model,
     )
     q_nnet.save('q_nnet.h5')
 
