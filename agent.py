@@ -49,37 +49,38 @@ class myEnv(gym.Env):
                 self.mouse_in
             )
         self.viewer.render(
-            self.arm1_coords, self.arm2_coords, self.arm1_ang, self.arm2_ang, self.target_coords
+            self.arm1_coords, self.arm2_coords, self.arm1_ang,
+            self.arm2_ang, self.target_coords
         )
 
     def reset(self):
 
         if self.mode == "hard":
-            pxy = np.random.randint(low = -self.viewer_xy[0] + self.center_coords[0],
-                                    high = self.viewer_xy[0] - self.center_coords[0],
-                                    size = 2)
+            pxy = np.random.randint(low=-self.viewer_xy[0] + self.center_coords[0],
+                                    high=self.viewer_xy[0] - self.center_coords[0],
+                                    size=2)
             self.target_coords[:] = np.clip(pxy, 100, 300)
-            self.got_target = False
 
         elif self.mode == "easy":
-            #TODO: mover el brazo a una posición aleatoria
             self.arm1_ang = 0
             self.arm2_ang = 0
             self.arm1_coords = np.array([0, 0])
             self.arm2_coords = np.array([0, 0])
             self.target_coords[:] = self.target_coords_init
-            self.got_target = False
         elif self.mode == "supereasy":
             # Do not restart anything
-            None
+            pass
         elif self.mode == "follow":
             self.target_coords += np.random.randint(low = -20, high = 20, size = 2)
             self.target_coords = np.clip(self.target_coords, 100, 300)
 
-        
-
         s = self._get_state()
+        self.got_target = self._got_target()
         return s  # observation
+
+    def _got_target(self):
+        dist = np.linalg.norm(self.arm2_coords - self.target_coords)
+        return dist < self.target_width
 
     def _get_state(self):
         """
@@ -107,14 +108,15 @@ class myEnv(gym.Env):
         self.arm2_coords[1] += self.arm2_long * np.sin(self.arm1_ang + self.arm2_ang)
 
         s = self._get_state()
+
         # Euclidean distance between
         dist = np.linalg.norm(self.arm2_coords - self.target_coords)
         r = -dist/200
-        
+
         if dist < self.target_width:
             r += 1
             if self.got_target:
-                r += 2
+                r += 1
             else:
                 self.got_target = True
         else:

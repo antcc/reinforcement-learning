@@ -1,6 +1,6 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from agent import myEnv as Agent
+from agent import myEnv
 import numpy as np
 import time
 from tensorflow.keras.optimizers import Adam
@@ -16,12 +16,13 @@ def build_q_nnet(n_vars, n_actions, alpha):
     model.add(Dense(20, input_shape=(n_vars,),
                     bias_initializer="RandomNormal",
                     activation="relu"))
-    model.add(Dense(20, input_shape=(n_vars,),
-                    bias_initializer="RandomNormal",
-                    activation="relu"))
+    # model.add(Dense(20,
+    #                 bias_initializer="RandomNormal",
+    #                 activation="relu"))
     model.add(Dense(n_actions))
     model.compile(loss='mse', optimizer=Adam(learning_rate=alpha))
     return model
+
 
 def replay(q_nnet, gamma, mem, n_actions, max_samples=100):
     if max_samples <= 0:
@@ -32,7 +33,6 @@ def replay(q_nnet, gamma, mem, n_actions, max_samples=100):
     X_train = np.zeros((n_samples, minibatch[0][0].shape[0]))
     y_train = np.zeros((n_samples, n_actions))
 
-    #TODO: predict all at once
     for i, (S, A, R, S_, done) in enumerate(minibatch):
         if not done:
             # next state is not terminal:
@@ -138,21 +138,21 @@ def main():
     np.random.seed(1)
     random.seed(1)
 
-    env = Agent(mode='follow')
+    env = myEnv(mode='follow')
     # TODO: change parameters & nnet structure
     q_nnet, episodes, steps, rewards = rl(
         env,
-        epsilon=0.05,
+        epsilon=0.1,
         alpha=1e-3,
-        gamma=0.9,
+        gamma=0.95,
         n_episodes=2000,
         vis=True,
         decay=0.99,
-        max_steps=500,
+        max_steps=400,
         n_memory=1,  #TODO: cambiar?
         batch_size=1,  # TODO: cambiar?
     )
-    q_nnet.save_weights('q_nnet.h5')
+    q_nnet.save('q_nnet.h5')
 
     # q_nnet = load_model('q_nnet.h5')
     total_R = test_policy(env, q_nnet, vis=True)
