@@ -87,10 +87,12 @@ def test_policy(env, q_nnet, vis=True,
 
 def rl(env, epsilon, alpha, gamma, n_episodes,
        sleep_time=0.001, actions=9, vis=True, max_steps=1000,
-       decay=0.99, min_epsilon=0.01, n_memory=500, batch_size=100):
+       decay=0.99, min_epsilon=0.01, n_memory=500, batch_size=100,
+       q_nnet = None):
 
-    state = env._get_state()
-    q_nnet = build_q_nnet(len(state), actions, alpha)
+    if q_nnet is None:
+        state = env._get_state()
+        q_nnet = build_q_nnet(len(state), actions, alpha)
     mem = deque(maxlen=n_memory)
     steps_hist = []
     rewards_hist = []
@@ -139,18 +141,20 @@ def main():
     random.seed(1)
 
     env = myEnv(mode='follow')
+    model = None # load_model('q_nnet.h5')
     # TODO: change parameters & nnet structure
     q_nnet, episodes, steps, rewards = rl(
         env,
         epsilon=0.1,
         alpha=1e-3,
-        gamma=0.95,
-        n_episodes=2000,
+        gamma=1.0,
+        n_episodes=200,
         vis=True,
         decay=0.99,
-        max_steps=400,
-        n_memory=1,  #TODO: cambiar?
+        max_steps=300,
+        n_memory=10,  #TODO: cambiar?
         batch_size=1,  # TODO: cambiar?
+        q_nnet=model
     )
     q_nnet.save('q_nnet.h5')
 
