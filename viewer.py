@@ -49,11 +49,12 @@ class Viewer(pyglet.window.Window):
             4, pyglet.gl.GL_QUADS, None, ("v2f", arm2_box), ("c3B", c1)
         )
 
-    def render(self, arm1_coords, arm2_coords, arm1_ang, arm2_ang):
+    def render(self, arm1_coords, arm2_coords, arm1_ang, arm2_ang, target_coords):
         self.arm1_coords = arm1_coords
         self.arm2_coords = arm2_coords
         self.arm1_ang = arm1_ang
         self.arm2_ang = arm2_ang
+        self.target_coords = target_coords
 
         pyglet.clock.tick()
         self._update_arm()

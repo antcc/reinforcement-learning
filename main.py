@@ -138,21 +138,21 @@ def main():
     np.random.seed(1)
     random.seed(1)
 
-    env = Agent(mode='easy')
+    env = Agent(mode='follow')
     # TODO: change parameters & nnet structure
     q_nnet, episodes, steps, rewards = rl(
         env,
-        epsilon=0.2,
+        epsilon=0.05,
         alpha=1e-3,
         gamma=0.9,
-        n_episodes=2,
+        n_episodes=2000,
         vis=True,
         decay=0.99,
-        max_steps=200,
+        max_steps=500,
         n_memory=1,  #TODO: cambiar?
         batch_size=1,  # TODO: cambiar?
     )
-    q_nnet.save_model('q_nnet.h5')
+    q_nnet.save_weights('q_nnet.h5')
 
     # q_nnet = load_model('q_nnet.h5')
     total_R = test_policy(env, q_nnet, vis=True)
