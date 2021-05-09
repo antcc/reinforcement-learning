@@ -145,15 +145,15 @@ def main():
     # TODO: change parameters & nnet structure
     q_nnet, episodes, steps, rewards = rl(
         env,
-        epsilon=0.1,
-        alpha=1e-3,
+        epsilon=0.2,
+        alpha=1e-2,
         gamma=1.0,
         n_episodes=200,
         vis=True,
         decay=0.99,
         max_steps=300,
-        n_memory=10,  #TODO: cambiar?
-        batch_size=1,  # TODO: cambiar?
+        n_memory=50,  #TODO: cambiar?
+        batch_size=5,  # TODO: cambiar?
         q_nnet=model
     )
     q_nnet.save('q_nnet.h5')

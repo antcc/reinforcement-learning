@@ -54,29 +54,28 @@ class myEnv(gym.Env):
         )
 
     def reset(self):
-
-        if self.mode == "hard":
-            pxy = np.random.randint(low=-self.viewer_xy[0] + self.center_coords[0],
-                                    high=self.viewer_xy[0] - self.center_coords[0],
-                                    size=2)
-            self.target_coords[:] = np.clip(pxy, 100, 300)
-
-        elif self.mode == "easy":
+        if self.mode == "supereasy": # Do not reset anything
+            pass
+        elif self.mode == "easy":  # Reset arm to (0, 0)
             self.arm1_ang = 0
             self.arm2_ang = 0
             self.arm1_coords = np.array([0, 0])
             self.arm2_coords = np.array([0, 0])
-            self.target_coords[:] = self.target_coords_init
-        elif self.mode == "supereasy":
-            # Do not restart anything
-            pass
-        elif self.mode == "follow":
-            self.target_coords += np.random.randint(low = -20, high = 20, size = 2)
+        elif self.mode == 'medium':  # Reset arm to random position
+            self.arm1_ang = np.random.uniform(0, 2*np.pi)
+            self.arm2_ang = np.random.uniform(0, 2*np.pi)
+            self.arm1_coords = np.random.randint(low=100, high=300, size=2)
+            self.arm2_coords = np.random.randint(low=100, high=300, size=2)
+        elif self.mode == "hard": # Move target to random position
+            pxy = np.random.randint(low=100, high=300, size=2)
+            self.target_coords[:] = pxy
+        elif self.mode == "follow":  # Move target to random nearby position
+            self.target_coords += np.random.randint(low=-20, high=20, size=2)
             self.target_coords = np.clip(self.target_coords, 100, 300)
 
         s = self._get_state()
         self.got_target = self._got_target()
-        return s  # observation
+        return s
 
     def _got_target(self):
         dist = np.linalg.norm(self.arm2_coords - self.target_coords)
