@@ -4,7 +4,7 @@ from agent import myEnv
 import numpy as np
 import time
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense, Flatten
 from tensorflow.keras.models import Sequential
 from collections import deque
 import random
@@ -146,11 +146,36 @@ def rl(env, epsilon, alpha, gamma, n_episodes,
     return q_nnet, episode + 1, steps_hist, rewards_hist
 
 
+def keras_rl():
+    env = myEnv(mode='hard')
+    n_actions = env.action_space.n
+
+    # Model
+    model = Sequential()
+    model.add(Dense(200, activation="relu", input_shape=(env.state_dim, )))
+    model.add(Dense(env.action_space.n))
+
+    from rl.agents.dqn import DQNAgent
+    from rl.memory import SequentialMemory
+    from rl.policy import LinearAnnealedPolicy, EpsGreedyQPolicy
+
+    memory = SequentialMemory(limit=5000, window_length=1)
+    policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps',
+                                  value_max=1., value_min=.1, value_test=.0,
+                                  nb_steps=50000)
+    dqn = DQNAgent(model=model, nb_actions=n_actions, memory=memory, nb_steps_warmup=10,
+                   target_model_update=1e-2, policy=policy, gamma=0.9)
+    dqn.compile(Adam(lr=1e-3), metrics=['mae'])
+
+    dqn.fit(env, nb_steps=50000, visualize=False, verbose=2, nb_max_episode_steps=200);
+    env2 = myEnv(mode='hard')
+    dqn.test(env2, nb_episodes=100, visualize=True);
+
 def main():
     np.random.seed(1)
     random.seed(1)
 
-    env = myEnv(mode='follow')
+    env = myEnv(mode='hard')
     model = None # load_model('q_nnet.h5')
     # TODO: change parameters & nnet structure
     q_nnet, episodes, steps, rewards = rl(
@@ -170,9 +195,11 @@ def main():
     q_nnet.save('q_nnet.h5')
 
     # q_nnet = load_model('q_nnet.h5')
-    total_R = test_policy(env, q_nnet, vis=True)
+    env2 = myEnv(mode='hard')
+    total_R = test_policy(env2, q_nnet, vis=True)
     print(f"Refuerzo total política: {total_R:.2f}")
 
 
 if __name__ == '__main__':
-    main()
+    keras_rl()
+    #main()

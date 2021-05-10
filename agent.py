@@ -8,7 +8,7 @@ class myEnv(gym.Env):
     metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 50}
 
     def __init__(self, target_coords=[250, 303], mode="hard"):
-        self.state_dim = 7
+        self.state_dim = 5
         self.dt = 0.1  # refresh rate
 
         self.arm1_long = 100
@@ -21,6 +21,7 @@ class myEnv(gym.Env):
         self.viewer = None
         self.viewer_xy = (400, 400)
         self.got_target = False
+        self.steps_in_target = 0
         self.mouse_in = np.array([False])
         self.target_width = 15
 
@@ -75,6 +76,8 @@ class myEnv(gym.Env):
 
         s = self._get_state()
         self.got_target = self._got_target()
+        if not self.got_target:
+            self.steps_in_target = 0
         return s
 
     def _got_target(self):
@@ -87,7 +90,8 @@ class myEnv(gym.Env):
         """
         a = (self.target_coords - self.center_coords)/200
         b = (self.target_coords - self.arm2_coords)/200
-        return np.array([*a, *b])
+        c = 1 if self.steps_in_target > 0 else 0
+        return np.array([*a, *b, c])
 
     def step(self, act):
         action1 = act // 3 - 1
