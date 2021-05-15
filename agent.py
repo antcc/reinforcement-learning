@@ -1,4 +1,3 @@
-from viewer import Viewer
 import gym
 import numpy as np
 from gym.spaces import Discrete, Box
@@ -8,7 +7,7 @@ class myEnv(gym.Env):
     metadata = {"render.modes": ["human", "rgb_array"],
                 "video.frames_per_second": 50}
 
-    def __init__(self, target_coords=[250, 300], mode="hard"):
+    def __init__(self, threshold=30, target_coords=[250, 300], mode="hard"):
         self.state_dim = 7
         self.dt = 0.1  # refresh rate
 
@@ -23,7 +22,7 @@ class myEnv(gym.Env):
         self.viewer_xy = (400, 400)
         self.got_target = False
         self.steps_in_target = 0
-        self.threshold = 40
+        self.threshold = threshold
         self.mouse_in = np.array([False])
         self.target_width = 15
 
