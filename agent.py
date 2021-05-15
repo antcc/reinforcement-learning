@@ -1,3 +1,4 @@
+from viewer import Viewer
 import gym
 import numpy as np
 from gym.spaces import Discrete, Box

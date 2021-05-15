@@ -186,8 +186,8 @@ def main():
 
     q_nnet, episodes, steps, rewards = rl(
         env,
-        epsilon=0.5,
-        alpha=0.1,
+        epsilon=0.25,
+        alpha=0.01,
         lr_decay=True,
         gamma=0.95,
         n_episodes=1000,
@@ -195,9 +195,9 @@ def main():
         vis=True,
         decay=0.99,
         max_steps=200,
-        max_memory=5000,
+        max_memory=100,
         n_memory=1,
-        batch_size=32,
+        batch_size=16,
         q_nnet=model,
     )
     q_nnet.save('q_nnet.h5')
