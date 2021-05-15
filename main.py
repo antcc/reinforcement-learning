@@ -1,44 +1,44 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from agent import myEnv
-import numpy as np
-import time
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.layers import Dense, Flatten
-from tensorflow.keras.models import Sequential
-from collections import deque
-import random
-from tensorflow.keras.models import load_model
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
+from tensorflow.keras.models import load_model
+import random
+from collections import deque
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Flatten
+from tensorflow.keras.optimizers import Adam, SGD
+import time
+import numpy as np
+from agent import myEnv
+
 
 def build_q_nnet(n_vars, n_actions, alpha, lr_decay):
     model = Sequential()
-    model.add(Dense(20, input_shape=(n_vars,),
+    model.add(Dense(50, input_shape=(n_vars,),
                     bias_initializer="RandomNormal",
                     activation="relu"))
-    # model.add(Dense(20,
-    #                 bias_initializer="RandomNormal",
-    #                 activation="relu"))
+    model.add(Dense(20, bias_initializer="RandomNormal",
+                    activation="relu"))
     model.add(Dense(n_actions))
 
     if lr_decay:
         lr = ExponentialDecay(
             alpha,
-            decay_steps=100000,
-            decay_rate=0.96,
+            decay_steps=1000,
+            decay_rate=0.9,
             staircase=True)
     else:
         lr = alpha
 
-    model.compile(loss='mse', optimizer=Adam(learning_rate=lr))
+    model.compile(loss='mse', optimizer=SGD(learning_rate=lr))
     return model
 
 
-def replay(q_nnet, gamma, mem, n_actions, max_samples=100):
-    if max_samples <= 0:
+def replay(q_nnet, gamma, mem, n_actions, batch_size=100):
+    if batch_size <= 0:
         return q_nnet
 
-    n_samples = min(max_samples, len(mem))
+    n_samples = min(batch_size, len(mem))
     minibatch = random.sample(list(mem), n_samples)
     X_train = np.zeros((n_samples, minibatch[0][0].shape[0]))
     y_train = np.zeros((n_samples, n_actions))
@@ -48,14 +48,14 @@ def replay(q_nnet, gamma, mem, n_actions, max_samples=100):
             # next state is not terminal:
             q_target = R + gamma*q_nnet.predict(S_.reshape(1, -1)).max()
         else:
-            q_target = R # next state is terminal
+            q_target = R  # next state is terminal
 
         target_vector = q_nnet.predict(S.reshape(1, -1))
         target_vector[0][A] = q_target
         X_train[i] = S
         y_train[i] = target_vector[0]
 
-    q_nnet.fit(X_train, y_train, verbose=0, epochs=1) # update
+    q_nnet.train_on_batch(X_train, y_train)   # update
     return q_nnet
 
 
@@ -70,7 +70,8 @@ def choose_action(state, nnet, epsilon):
 
 
 def test_policy(env, q_nnet, vis=True,
-                sleep_time=0.001, max_steps=1000):
+                sleep_time=0.001,
+                max_steps=1000):
     S = env.reset()
     total_reward = 0
 
@@ -97,13 +98,13 @@ def test_policy(env, q_nnet, vis=True,
 
 def rl(env, epsilon, alpha, gamma, n_episodes,
        sleep_time=0.001, actions=9, vis=True, max_steps=1000,
-       decay=0.99, min_epsilon=0.01, n_memory=500, batch_size=100,
-       q_nnet=None, lr_decay=False):
-
+       decay=0.99, min_epsilon=0.01, max_memory=5000, n_memory=500,
+       batch_size=100, q_nnet=None, lr_decay=False):
+    """Perform reinforcement learning."""
     if q_nnet is None:
-        state = env._get_state()
-        q_nnet = build_q_nnet(len(state), actions, alpha, lr_decay)
-    mem = deque(maxlen=n_memory)
+        q_nnet = build_q_nnet(env.state_dim, actions, alpha, lr_decay)
+
+    mem = deque(maxlen=max_memory)
     steps_hist = []
     rewards_hist = []
 
@@ -132,13 +133,15 @@ def rl(env, epsilon, alpha, gamma, n_episodes,
             if done:
                 steps_hist.append(step + 1)
                 rewards_hist.append(total_reward + 1)
-                q_nnet = replay(q_nnet, gamma, mem, actions, (step + 1) % n_memory) # TODO: ????
+                q_nnet = replay(q_nnet, gamma, mem, actions,
+                                (step + 1) % n_memory)  # TODO: ????
                 print('Episodio %s: total steps = %s, total reward = %.2f' % (
                     episode + 1, step + 1, total_reward))
                 break
 
             elif step + 1 == max_steps:
-                print(f"Episodio {episode + 1}: no alcanza tras {step + 1} pasos")
+                print(
+                    f"Episodio {episode + 1}: no alcanza tras {step + 1} pasos")
 
         if epsilon > min_epsilon:
             epsilon *= decay
@@ -152,7 +155,8 @@ def keras_rl():
 
     # Model
     model = Sequential()
-    model.add(Dense(200, activation="relu", input_shape=(env.state_dim, )))
+    model.add(Flatten(input_shape=(1,) + env.observation_space.shape))
+    model.add(Dense(200, activation="relu"))
     model.add(Dense(env.action_space.n))
 
     from rl.agents.dqn import DQNAgent
@@ -167,29 +171,33 @@ def keras_rl():
                    target_model_update=1e-2, policy=policy, gamma=0.9)
     dqn.compile(Adam(lr=1e-3), metrics=['mae'])
 
-    dqn.fit(env, nb_steps=50000, visualize=False, verbose=2, nb_max_episode_steps=200);
+    dqn.fit(env, nb_steps=50000, visualize=False,
+            verbose=2, nb_max_episode_steps=200)
     env2 = myEnv(mode='hard')
-    dqn.test(env2, nb_episodes=100, visualize=True);
+    dqn.test(env2, nb_episodes=100, visualize=True)
+
 
 def main():
     np.random.seed(1)
     random.seed(1)
 
     env = myEnv(mode='hard')
-    model = None # load_model('q_nnet.h5')
-    # TODO: change parameters & nnet structure
+    model = None  # load_model('q_nnet.h5')
+
     q_nnet, episodes, steps, rewards = rl(
         env,
-        epsilon=0.2,
-        alpha=1e-1,
+        epsilon=0.5,
+        alpha=0.1,
         lr_decay=True,
-        gamma=1.0,
-        n_episodes=200,
+        gamma=0.95,
+        n_episodes=1000,
+        min_epsilon=0.01,
         vis=True,
         decay=0.99,
-        max_steps=300,
-        n_memory=50,  #TODO: cambiar?
-        batch_size=5,  # TODO: cambiar?
+        max_steps=200,
+        max_memory=5000,
+        n_memory=1,
+        batch_size=32,
         q_nnet=model,
     )
     q_nnet.save('q_nnet.h5')
@@ -201,5 +209,4 @@ def main():
 
 
 if __name__ == '__main__':
-    keras_rl()
-    #main()
+    main()

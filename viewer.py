@@ -83,8 +83,10 @@ class Viewer(pyglet.window.Window):
         )
         self.target.vertices = target_box
 
-        arm1_aux = np.hstack((self.center_coords, self.arm1_coords))  # (x0, y0, x1, y1)
-        arm2_aux = np.hstack((self.arm1_coords, self.arm2_coords))  # (x1, y1, x2, y2)
+        # (x0, y0, x1, y1)
+        arm1_aux = np.hstack((self.center_coords, self.arm1_coords))
+        # (x1, y1, x2, y2)
+        arm2_aux = np.hstack((self.arm1_coords, self.arm2_coords))
 
         arm1_thick_rad = np.pi / 2 - self.arm1_ang
         x01 = arm1_aux[0] - np.cos(arm1_thick_rad) * self.bar_thc
