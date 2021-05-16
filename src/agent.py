@@ -8,7 +8,7 @@ class myEnv(gym.Env):
     metadata = {"render.modes": ["human", "rgb_array"],
                 "video.frames_per_second": 50}
 
-    def __init__(self, threshold=30, target_coords=[250, 300], mode="hard"):
+    def __init__(self, threshold=20, target_coords=[250, 300], mode="hard"):
         self.state_dim = 7
         self.dt = 0.1  # refresh rate
 
@@ -21,14 +21,14 @@ class myEnv(gym.Env):
 
         self.viewer = None
         self.viewer_xy = (400, 400)
+        self.norm_dist = self.viewer_xy[0]/2.
         self.got_target = False
         self.steps_in_target = 0
         self.threshold = threshold
         self.mouse_in = np.array([False])
         self.target_width = 15
 
-        self.action_space = Discrete(3 * 3)  #
-        # observation:
+        self.action_space = Discrete(3 * 3)
         self.observation_space = Box(
             low=-1e10, high=1e10, shape=(self.state_dim,), dtype=np.float32
         )
@@ -39,7 +39,7 @@ class myEnv(gym.Env):
         self.target_coords_init = self.target_coords.copy()
         self.center_coords = np.array(self.viewer_xy) / 2
 
-    def render(self):
+    def render(self, mode="human"):
         if self.viewer is None:
             self.viewer = Viewer(
                 *self.viewer_xy,
@@ -77,18 +77,18 @@ class myEnv(gym.Env):
             self.target_coords = np.clip(self.target_coords, 100, 300)
 
         s = self._get_state()
+        self.steps_in_target = 0
+        self.got_target = False
 
         return s
 
     def _get_state(self):
-        """
-        Returns internal state
-        """
-        target_pos = (self.target_coords - self.center_coords)/200
-        arm1_pos = (self.arm1_coords - self.center_coords)/200
-        arm2_dist = (self.target_coords - self.arm2_coords)/200
-        has_target = 1 if self.steps_in_target > 0 else 0
-        return np.array([*target_pos, *arm1_pos, *arm2_dist, has_target])
+        """Returns internal state."""
+        target_pos = (self.target_coords - self.center_coords)/self.norm_dist
+        arm1_dist = (self.target_coords - self.arm1_coords)/self.norm_dist
+        arm2_dist = (self.target_coords - self.arm2_coords)/self.norm_dist
+        has_target = 1.0 if self.steps_in_target > 0 else 0.0
+        return np.array([*target_pos, *arm1_dist, *arm2_dist, has_target])
 
     def step(self, act):
         action1 = act // 3 - 1
@@ -113,15 +113,16 @@ class myEnv(gym.Env):
 
         # Euclidean distance between target and arm2
         dist = np.linalg.norm(self.arm2_coords - self.target_coords)
-        r = -dist/200.
+        r = -dist/self.norm_dist
 
-        if not self.got_target and dist <= self.target_width:  # if touching the target
-            r += 1
+        # Modify reward
+        if dist <= self.target_width:  # if touching the target
+            r += np.sqrt(2)
             self.steps_in_target += 1
             if self.steps_in_target > self.threshold:
                 r += 10
                 self.got_target = True
-        elif dist > self.target_width:
+        else:
             self.steps_in_target = 0
             self.got_target = False
 
